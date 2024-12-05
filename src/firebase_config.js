@@ -3,17 +3,15 @@ import { initializeApp } from "firebase/app";
 import { GoogleAuthProvider } from "firebase/auth";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
+// Firebase configuration using environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyDz_u3Yoks5PK9xgCgQOfeNNZYZxd0qzaU",
-  authDomain: "messanger-902a6.firebaseapp.com",
-  projectId: "messanger-902a6",
-  storageBucket: "messanger-902a6.firebasestorage.app",
-  messagingSenderId: "963093421473",
-  appId: "1:963093421473:web:b34fd4dbe038fbe9ca3fe0"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase
