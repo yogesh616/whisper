@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#popup-modal {
+   position: absolute;
+   left: 50%;
+   top: 55%;
+   transform: translate(-50%, -50%);
+   width: 500px;
+
+}
+
+
+
+
+#drawer {
+   background-color: #242424;
+   width: 100vw;
+   height: 100vh;
+   position: fixed;
+   left: -100%;
+   top: 0;
+   transition: all 0.3s ease-in-out;
+   z-index: 100;
+}
+
+.close {
+   left: -100%;
+}
+.show {
+   left: 0;
+}
