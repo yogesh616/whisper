@@ -14,7 +14,7 @@ export const UserProvider =({children}) => {
         "https://4kwallpapers.com/images/wallpapers/landscape-purple-19680.jpg",
     ] 
     const bgImages = [
-        "https://4kwallpapers.com/images/walls/thumbs_3t/17436.jpg",
+        "https://4kwallpapers.com/images/wallpapers/vibrant-landscape-3840x2160-17436.jpg",
         "https://img.freepik.com/free-vector/dark-gradient-background-with-copy-space_53876-99548.jpg?t=st=1733474664~exp=1733478264~hmac=f3ebf1a3162f4a7f5a43b6165191acdd091f93f18cb7ae1fc8282ca6eb1a37f3&w=1380",
         "https://img.freepik.com/free-vector/set-torii-gates-water_52683-44986.jpg?t=st=1733474732~exp=1733478332~hmac=6667e16c40647a0bd761204a86515a86b3ec823dfa0d4b7034d8458b332b0df4&w=1380",
         "https://img.freepik.com/free-vector/cute-fox-kitsune-surfing-beach-cartoon-vector-icon-illustration-animal-holiday-icon-isolated-flat_138676-9860.jpg?t=st=1733474757~exp=1733478357~hmac=fecab117f0ae769f48ad47a70d375bc627f1136ae1a0adaa33c888c952e92f33&w=826",
