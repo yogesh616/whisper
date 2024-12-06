@@ -63,33 +63,36 @@ const Header = () => {
 
       {/* Stories */}
       <div className="flex space-x-4 mt-4 overflow-x-auto">
-        <div className="flex flex-col items-center">
+        <div className=" flex-col items-center hidden">
           <div className="h-16 w-16 rounded-full border border-gray-300 flex items-center justify-center">
             <span className="text-2xl font-bold">+</span>
           </div>
           <p className="text-sm mt-2">Add story</p>
         </div>
-        {users.map((userItem, index) => (
-          <div key={index} className="flex flex-col items-center">
-            <div className="relative me-4">
-              <img
-                className="w-10 h-10 rounded-full"
-                src={userItem.photoURL}
-                alt="profile image"
-                onError={(e) =>
-                  (e.target.src =
-                    "https://www.pngall.com/wp-content/uploads/5/Profile-Avatar-PNG.png")
-                }
-              />
-              <span
-                className={`top-0 start-7 absolute w-3.5 h-3.5 border-2 rounded-full ${
-                  userItem.status ? "bg-green-500" : "bg-slate-300"
-                }`}
-              ></span>
-            </div>
-            <p className="text-sm mt-2">{userItem.displayName}</p>
-          </div>
-        ))}
+        <div className="flex gap-2 overflow-x-auto">
+  {users.map((userItem, index) => (
+    <div key={index} className="flex flex-col items-center shrink-0">
+      <div className="relative me-4">
+        <img
+          className="w-10 h-10 rounded-full object-cover"
+          src={userItem.photoURL}
+          alt={`${userItem.displayName}'s profile`}
+          onError={(e) =>
+            (e.target.src =
+              "https://www.pngall.com/wp-content/uploads/5/Profile-Avatar-PNG.png")
+          }
+        />
+        <span
+          className={`top-0 start-7 absolute w-3.5 h-3.5 border-2 rounded-full ${
+            userItem.status ? "bg-green-500" : "bg-slate-300"
+          }`}
+        ></span>
+      </div>
+      <p className="text-sm mt-2 text-center">{userItem.displayName}</p>
+    </div>
+  ))}
+</div>
+
       </div>
     </div>
   );
