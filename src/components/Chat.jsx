@@ -94,9 +94,9 @@ const Chat = () => {
   }, [userId, receiverId]);
 
   const scrollToBottom = () => {
-    console.log('Before scrolling:', messagesEndRef.current?.offsetTop);
+  
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    console.log('After scrolling:', messagesEndRef.current?.offsetTop);
+   
   };
   
   
