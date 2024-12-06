@@ -3,6 +3,9 @@ import { useParams, useLocation } from "react-router-dom";
 import { collection, addDoc, Timestamp, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db, auth } from "../firebase_config";
 import { onAuthStateChanged } from "firebase/auth";
+import { useUser } from "../Context/Context";
+import '../App.css'
+import notification from '../assets/notification.mp3'
 
 const Chat = () => {
   const { id: receiverId } = useParams();
@@ -15,22 +18,16 @@ const Chat = () => {
   const [bgurl, setBgUrl ] = useState(() => {
     const url = localStorage.getItem('bgurl');
     return url || ''  });
+    const [chatFont, setChatFont ] = useState(() => {
+      const url = localStorage.getItem('font');
+      return url || ''  });
   const audio = useRef(
     new Audio(
-      "https://dw.zobj.net/download/v1/brw4tJZGFL8esj8C3eHz-OMBpocxZd57V4EjFYbf3FcIMCcadNZT6n7Pf46xlDTBY4OG91k1EzHbhtNMJrQPN4B0_LNrT5zkkmZF3CxTF-CfD-4ne7nGhfLg3Eq8/?a=&c=72&f=notification.mp3&special=1733319990-6DJQVCKTUayV7a9YYsHd4A53QqydUFwTIXWiYDJMUkA%3D"
-    )
+    notification )
   );
-  
+  const { bgImages, fonts } = useUser();
 
-  const bgImages = [
-    "https://4kwallpapers.com/images/wallpapers/earth-orbit-sun-scenic-12453.jpg",
-    "https://4kwallpapers.com/images/wallpapers/november-5k-outer-19789.jpg",
-    "https://4kwallpapers.com/images/wallpapers/astronaut-space-10019.jpg",
-    "https://4kwallpapers.com/images/wallpapers/earthbound-2024-11791.jpg",
-    "https://4kwallpapers.com/images/wallpapers/earth-sunrise-12523.jpg",
-    "https://4kwallpapers.com/images/wallpapers/red-flowers-17714.jpg",
-    "https://4kwallpapers.com/images/wallpapers/landscape-purple-19680.jpg"
-  ];
+  
 
   const offcanvasRef = useRef(null);
   const chatRef = useRef(null);
@@ -66,6 +63,8 @@ const Chat = () => {
           timestamp: Timestamp.fromDate(new Date()),
         });
         setNewMessage("");
+        scrollToBottom();
+        scrollToBottom();
       } catch (err) {
         console.error("Error sending message:", err);
       }
@@ -88,14 +87,20 @@ const Chat = () => {
       }
 
       scrollToBottom();
+      scrollToBottom();
     });
 
     return () => unsubscribe();
   }, [userId, receiverId]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    console.log('Before scrolling:', messagesEndRef.current?.offsetTop);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    console.log('After scrolling:', messagesEndRef.current?.offsetTop);
   };
+  
+  
+  
 
   function handleEnter(e) {
     if (e.key === "Enter" && newMessage) {
@@ -110,11 +115,19 @@ const Chat = () => {
       
     }
   }
+  function changeFont(font) {
+    if (chatRef.current) {
+      chatRef.current.style.fontFamily = font; 
+     toggleOffcanvas();
+      localStorage.setItem('font', font);
+      
+    }
+  }
   
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <div className="flex items-center justify-between gap-2 p-4 bg-white shadow-md">
+    <div className="flex flex-col h-screen bg-zinc-700">
+      <div className="flex bg-zinc-700 items-center justify-between gap-2 p-1 px-3 text-slate-200 shadow-md">
         <div className="flex items-center gap-2">
           <img
             className="w-10 h-10 rounded-full"
@@ -134,7 +147,7 @@ const Chat = () => {
 
       <div
         ref={offcanvasRef}
-        className="fixed inset-y-0 right-0 w-64 bg-gray-800 text-white transform translate-x-full transition-transform duration-300"
+        className="fixed inset-y-0 right-0 w-64 bg-zinc-700 text-white transform translate-x-full transition-transform duration-300"
       >
         <div className="flex items-center justify-between p-4">
           <h1 className="text-xl">Themes</h1>
@@ -144,7 +157,7 @@ const Chat = () => {
             </svg>
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-4 p-4">
+        <div className="grid grid-cols-2 gap-4 p-4 overflow-auto h-1/2">
           {bgImages.map((bgImage, index) => (
             <div
               key={index}
@@ -154,10 +167,23 @@ const Chat = () => {
             ></div>
           ))}
         </div>
+        <h1 className="text-xl px-4">Fonts</h1>
+        <div className="flex flex-col items-center gap-4  px-2 overflow-auto h-1/2 pb-3">
+          {fonts.map((font, index) => (
+            <div
+              key={index}
+              style={{ fontFamily: font }}
+              className=" w-24 h-auto bg-cover bg-center rounded-md cursor-pointer hover:opacity-80"
+              onClick={() => changeFont(font)}
+            >{font}</div>
+          ))}
+        </div>
+
       </div>
 
-      <div id='theme' ref={chatRef} style={{backgroundImage: `url(${bgurl})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'overlay', transition: 'all 0.8s ease'}} className=" flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((message, index) => (
+      <div id='theme' ref={chatRef} style={{fontFamily: chatFont, backgroundImage: `url(${bgurl})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'overlay', transition: 'all 0.5s ease'}} className=" flex-1 overflow-y-auto p-4 space-y-3">
+       
+        {messages ? messages.map((message, index) => (
           <div key={index} className={`flex ${message.sender === userId ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-xs p-3 rounded-lg ${
@@ -167,11 +193,15 @@ const Chat = () => {
               <p className="text-sm">{message.text}</p>
             </div>
           </div>
-        ))}
+        )) : (<div className="loader">
+          <svg viewBox="0 0 80 80">
+            <circle r="32" cy="40" cx="40" id="test"></circle>
+          </svg>
+        </div>)}
         <div ref={messagesEndRef} />
       </div>
 
-      <div  className="p-4 bg-white shadow-inner">
+      <div  className="p-2 bg-zinc-700 shadow-inner">
         <div className="flex items-center space-x-3">
           <input
             type="text"

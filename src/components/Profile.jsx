@@ -22,6 +22,9 @@ function Profile() {
         setUserId(user.uid); // Set user ID
        
       }
+      else {
+        navigate('/')
+      }
     });
   
     return () => unsubscribe(); // Cleanup listener on component unmount

@@ -117,7 +117,9 @@ useEffect(() => {
             </svg>
             Google</div>)}
           </button>
+         
         </div>
+        <span className='px-3 text-gray-700'>Currently only <strong>Google Sign-In</strong> is working!</span>
       </div>
     </div>
   );
