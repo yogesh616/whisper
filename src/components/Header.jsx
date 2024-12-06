@@ -4,11 +4,13 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db, auth } from "../firebase_config";
 import { useUser } from "../Context/Context";
 import { onAuthStateChanged } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
 const Header = () => {
   const [users, setUsers] = useState([]); // State to hold all users
   const { setUserListData } = useUser();
   const [user, setUser] = useState(null); // State to hold the logged-in user
+  const navigate = useNavigate();
   
   useEffect(() => {
     // Listen for authentication state changes to get the logged-in user
@@ -51,6 +53,11 @@ const Header = () => {
     }
   }, [user]); // Dependency on `user` state
 
+  const handleChatClick = (data) => {
+    navigate(`/chat/${data.id}`, { state: { data }});
+    
+  };
+
   return (
     <div className="p-4 bg-white shadow-md">
       <div className="flex justify-between items-center">
@@ -71,8 +78,8 @@ const Header = () => {
         </div>
         <div className="flex gap-2 overflow-x-auto">
   {users.map((userItem, index) => (
-    <div key={index} className="flex flex-col items-center shrink-0">
-      <div className="relative me-4">
+    <div key={index} className="flex flex-col items-center shrink-0" >
+      <div className="relative me-4"  onClick={() => handleChatClick(userItem)}>
         <img
           className="w-10 h-10 rounded-full object-cover"
           src={userItem.photoURL}
