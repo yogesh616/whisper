@@ -190,7 +190,10 @@ const Chat = () => {
                 message.sender === userId ? "bg-blue-500 text-white rounded-br-none" : "bg-gray-200 text-gray-900 rounded-bl-none"
               }`}
             >
-              <p className="text-sm">{message.text}</p>
+              {message.text && <p>{message.text}</p>}
+              {message.image && (
+                <img src={message.image} alt="uploaded" className="mt-2 rounded w-10" />
+              )}
             </div>
           </div>
         )) : (<div className="loader">
