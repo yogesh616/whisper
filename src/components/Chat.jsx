@@ -192,7 +192,7 @@ const Chat = () => {
             >
               {message.text && <p>{message.text}</p>}
               {message.image && (
-              { /*  <img src={message.image} alt="uploaded" className="mt-2 rounded w-10" /> */ }
+             
                <img src={message.image} alt="uploaded" className="p-0.5 rounded-md w-48" />
               )}
             </div>
