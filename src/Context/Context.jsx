@@ -1,7 +1,14 @@
 import { Children, createContext, useContext, useState } from "react";
 
 const UserContext = createContext();
-
+import bridge from '../assets/bridge.jpg'
+import glacier from '../assets/glacier.jpg'
+import jinwoo from '../assets/jinwoo.jpg'
+import kimino from '../assets/kimino.jpg'
+import landscape from '../assets/landscape.jpg'
+import name from '../assets/name.jpg'
+import sung from '../assets/sung.jpg'
+import volcano from '../assets/volcano.jpg'
 
 export const UserProvider =({children}) => {
     const [ userListData, setUserListData ] = useState([])
@@ -14,14 +21,7 @@ export const UserProvider =({children}) => {
         "https://4kwallpapers.com/images/wallpapers/landscape-purple-19680.jpg",
     ] 
     const bgImages = [
-        "https://4kwallpapers.com/images/wallpapers/vibrant-landscape-3840x2160-17436.jpg",
-        "https://4kwallpapers.com/images/wallpapers/glacier-point-yosemite-valley-national-park-colorful-3840x2160-6412.jpg",
-        "https://4kwallpapers.com/images/wallpapers/golden-gate-bridge-3840x2160-17401.jpg",
-        "https://4kwallpapers.com/images/wallpapers/volcanic-moon-3840x2160-19153.jpg",
-        "https://4kwallpapers.com/images/wallpapers/kimi-no-na-wa-love-3840x2160-19857.jpg",
-        "https://4kwallpapers.com/images/wallpapers/your-name-shooting-3840x2160-14938.jpg",
-        "https://4kwallpapers.com/images/wallpapers/sung-jinwoo-amoled-3840x2160-15859.jpg",
-        "https://4kwallpapers.com/images/wallpapers/sung-jinwoo-solo-3840x2160-17972.jpg",
+        bridge, glacier, jinwoo, kimino, landscape, name, sung, volcano
         
       ];
 
