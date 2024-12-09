@@ -59,7 +59,8 @@ const ChatList = () => {
               />
               <div>
                 <h3 className="font-semibold">{user.displayName}</h3>
-                <p className="text-sm text-gray-600">{lastMessage.text || "No messages yet"}</p>
+                {lastMessage.text && (<p className="text-sm text-gray-600">{lastMessage.text || "No messages yet"}</p>)}
+                {lastMessage.image && (<p className="text-sm text-gray-600">Sent a photo</p>)}
               </div>
             </div>
             <div className="text-right">
