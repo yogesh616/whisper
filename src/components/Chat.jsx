@@ -29,6 +29,8 @@ const Chat = () => {
     notification )
   );
   const { bgImages, fonts } = useUser();
+  const [image, setImage] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   
 
