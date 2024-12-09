@@ -69,7 +69,7 @@ const Header = () => {
       </div>
 
       {/* Stories */}
-      <div className="flex space-x-4 mt-4 overflow-x-auto">
+      <div className="flex space-x-4 mt-4 overflow-x-auto hide-scrollbar">
         <div className=" flex-col items-center hidden">
           <div className="h-16 w-16 rounded-full border border-gray-300 flex items-center justify-center">
             <span className="text-2xl font-bold">+</span>
