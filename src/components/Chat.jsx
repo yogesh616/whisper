@@ -296,7 +296,7 @@ const Chat = () => {
     <input type="file" id="file" name="file" onChange={(e) => uploadImage(e.target.files[0])} />
   </div>
   <input required="" placeholder="Message..." type="text" id="messageInput" value={newMessage} onChange={e=> setNewMessage(e.target.value)} onKeyDown={handleEnter}  />
-  <button id="sendButton">
+  <button id="sendButton" onClick={sendMessage}>
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 664 663">
       <path
         fill="none"
