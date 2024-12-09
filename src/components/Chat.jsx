@@ -10,7 +10,10 @@ import notification from '../assets/notification.mp3'
 const Chat = () => {
   const { id: receiverId } = useParams();
   const [userId, setUserId] = useState(null);
-  const [messages, setMessages] = useState([]);
+   const [messages, setMessages] = useState(() => {
+    const chats = localStorage.getItem('chats');
+    return chats? JSON.parse(chats) : [];
+  });
   const [newMessage, setNewMessage] = useState("");
   const { state } = useLocation();
   const [userData, setUserData] = useState(state?.data || {});
@@ -81,7 +84,7 @@ const Chat = () => {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const messagesArray = querySnapshot.docs.map((doc) => doc.data());
       setMessages(messagesArray);
-
+       localStorage.setItem('chats', JSON.stringify(messagesArray));
       if (querySnapshot.size && querySnapshot.docs[querySnapshot.size - 1].data().sender !== userId) {
         audio.current.play();
       }
