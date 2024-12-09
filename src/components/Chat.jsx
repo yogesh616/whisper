@@ -1,59 +1,55 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
-import {
-  collection,
-  addDoc,
-  Timestamp,
-  onSnapshot,
-  query,
-  orderBy,
-} from "firebase/firestore";
+import { useParams, useLocation } from "react-router-dom";
+import { collection, addDoc, Timestamp, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db, auth } from "../firebase_config";
 import { onAuthStateChanged } from "firebase/auth";
 import { useUser } from "../Context/Context";
 import "../App.css";
 import notification from "../assets/notification.mp3";
+import { useNavigate } from "react-router-dom";
 
 const Chat = () => {
   const { id: receiverId } = useParams();
   const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState(() => {
-    const chats = localStorage.getItem("chats");
-    return chats ? JSON.parse(chats) : [];
+    const chats = localStorage.getItem('chats');
+    return chats? JSON.parse(chats) : [];
   });
-  const [newMessage, setNewMessage] = useState("");
+  const [newMessage, setNewMessage] = useState(null);
   const { state } = useLocation();
   const [userData, setUserData] = useState(state?.data || {});
+  const messagesEndRef = useRef(null);
+  const navigate = useNavigate();
   const [bgurl, setBgUrl] = useState(() => localStorage.getItem("bgurl") || "");
   const [chatFont, setChatFont] = useState(() => localStorage.getItem("font") || "");
   const [image, setImage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const audio = useRef(new Audio(notification));
-  const messagesEndRef = useRef(null);
-  const offcanvasRef = useRef(null);
-  const chatRef = useRef(null);
-  const navigate = useNavigate();
   const { bgImages, fonts } = useUser();
 
-  // Handle user authentication
+  const offcanvasRef = useRef(null);
+  const chatRef = useRef(null);
+
+  // Set user ID from Firebase Auth
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setUserId(user.uid);
-      } else {
+      }
+      else {
         navigate("/");
       }
     });
     return () => unsubscribe();
-  }, [navigate]);
+  }, []);
 
-  // Scroll to bottom
+  // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   };
 
-  // Generate chat ID
+  // Get chat ID
   const getChatId = () => [userId, receiverId].sort().join("_");
 
   // Fetch messages in real-time
@@ -67,7 +63,7 @@ const Chat = () => {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const messagesArray = querySnapshot.docs.map((doc) => doc.data());
       setMessages(messagesArray);
-      localStorage.setItem("chats", JSON.stringify(messagesArray));
+      localStorage.setItem('chats', JSON.stringify(messagesArray));
 
       // Play notification sound if a new message is received
       if (
@@ -82,7 +78,7 @@ const Chat = () => {
     return () => unsubscribe();
   }, [userId, receiverId]);
 
-  // Send a text message
+  // Send message
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
@@ -106,26 +102,26 @@ const Chat = () => {
     }
   };
 
-  // Upload and send an image
+  // Upload image
   const uploadImage = async (image) => {
     if (!image) return;
-
+  
     setIsUploading(true);
-
+  
     const data = new FormData();
     data.append("file", image);
     data.append("upload_preset", "profilepic");
-
+  
     try {
       const res = await fetch("https://api.cloudinary.com/v1_1/dgmuxyoc0/upload", {
         method: "POST",
         body: data,
       });
-
+  
       if (!res.ok) {
         throw new Error(`Failed to upload image: ${res.statusText}`);
       }
-
+  
       const result = await res.json();
       await sendImage(result.secure_url); // Send the image message after successful upload
     } catch (err) {
@@ -135,8 +131,8 @@ const Chat = () => {
       setImage(null); // Reset the image state
     }
   };
-
-  // Send an image as a message
+  
+  // Send image as a message
   const sendImage = async (imageUrl) => {
     try {
       const chatId = getChatId();
@@ -157,7 +153,7 @@ const Chat = () => {
     }
   };
 
-  // Handle "Enter" key press
+  // Handle Enter key for sending messages
   const handleEnter = (e) => {
     if (e.key === "Enter") sendMessage();
   };
@@ -167,6 +163,18 @@ const Chat = () => {
     if (offcanvasRef.current) {
       offcanvasRef.current.classList.toggle("translate-x-0");
       offcanvasRef.current.classList.toggle("translate-x-full");
+  const scrollToBottom = () => {
+  
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+   
+  };
+  
+  
+  
+
+  function handleEnter(e) {
+    if (e.key === "Enter" && newMessage) {
+      sendMessage();
     }
   };
 
@@ -227,16 +235,14 @@ const Chat = () => {
           ))}
         </div>
         <h1 className="text-xl px-4">Fonts</h1>
-        <div className="flex flex-col items-center gap-4 px-2 overflow-auto h-1/2 pb-3">
+        <div className="flex flex-col items-center gap-4  px-2 overflow-auto h-1/2 pb-3">
           {fonts.map((font, index) => (
             <div
               key={index}
               style={{ fontFamily: font }}
-              className="w-24 h-auto rounded-md cursor-pointer hover:opacity-80"
+              className=" w-24 h-auto bg-cover bg-center rounded-md cursor-pointer hover:opacity-80"
               onClick={() => changeFont(font)}
-            >
-              {font}
-            </div>
+            >{font}</div>
           ))}
         </div>
       </div>
@@ -255,63 +261,80 @@ const Chat = () => {
         {messages.map((message, index) => (
           <div
             key={index}
-            className={`flex items-start gap-2 p-2 rounded-md shadow ${
-              message.sender === userId ? "bg-blue-500 text-white self-end" : "bg-gray-300"
-            }`}
+            className={`flex ${message.sender === userId ? "justify-end" : "justify-start"}`}
           >
-            <img
-              src={message.photo || "https://www.pngall.com/wp-content/uploads/5/Profile-Avatar-PNG.png"}
-              alt="profile"
-              className="w-10 h-10 rounded-full"
-            />
-            <div>
+            <div
+              className={`max-w-xs p-1 px-2 rounded-lg ${
+                message.sender === userId
+                  ? "bg-blue-500 text-white rounded-br-none"
+                  : "bg-gray-200 text-gray-900 rounded-bl-none"
+              }`}
+            >
               {message.text && <p>{message.text}</p>}
-              {message.image && <img src={message.image} alt="uploaded" className="p-0.5 rounded-md w-48" />}
+              {message.image && (
+                <img src={message.image} alt="uploaded" className="p-0.5 rounded-md w-48" />
+              )}
+              {message.text && <p>{message.text}</p>}
+              {message.image && (
+             
+               <img src={message.image} alt="uploaded" className="p-0.5 rounded-md w-48" />
+              )}
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef}></div>
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Section */}
-      <div className="flex items-center p-2 bg-gray-700 gap-2">
-        <input
-          type="file"
-          accept="image/*"
-          id="imageInput"
-          onChange={(e) => uploadImage(e.target.files[0])}
-          hidden
-        />
-        <label htmlFor="imageInput" className="cursor-pointer">
-          {isUploading ? (
-            <div className="w-8 h-8 rounded-full animate-spin border-4 border-white border-t-transparent"></div>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-6 h-6 text-white"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 12l6-6m0 0l6 6m-6-6v12"
-              />
-            </svg>
-          )}
-        </label>
-        <input
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={handleEnter}
-          placeholder="Type a message..."
-          className="flex-1 p-2 rounded-lg bg-gray-200"
-        />
-        <button onClick={sendMessage} className="text-white p-2 bg-blue-500 rounded-md hover:bg-blue-600">
-          Send
-        </button>
+      {/* Input */}
+      <div className="p-2 bg-zinc-700 shadow-inner">
+      
+<div className="messageBox">
+  <div className="fileUploadWrapper">
+    <label htmlFor="file">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 337 337">
+        <circle
+          strokeWidth="20"
+          stroke="#6c6c6c"
+          fill="none"
+          r="158.5"
+          cy="168.5"
+          cx="168.5"
+        ></circle>
+        <path
+          strokeLinecap="round"
+          strokeWidth="25"
+          stroke="#6c6c6c"
+          d="M167.759 79V259"
+        ></path>
+        <path
+          strokeLinecap="round"
+          strokeWidth="25"
+          stroke="#6c6c6c"
+          d="M79 167.138H259"
+        ></path>
+      </svg>
+      <span className="tooltip">Add an image</span>
+    </label>
+    <input type="file" id="file" name="file" onChange={(e) => uploadImage(e.target.files[0])} />
+  </div>
+  <input required="" placeholder="Message..." type="text" id="messageInput" value={newMessage} onChange={e=> setNewMessage(e.target.value)} onKeyDown={handleEnter}  />
+  <button id="sendButton">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 664 663">
+      <path
+        fill="none"
+        d="M646.293 331.888L17.7538 17.6187L155.245 331.888M646.293 331.888L17.753 646.157L155.245 331.888M646.293 331.888L318.735 330.228L155.245 331.888"
+      ></path>
+      <path
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        strokeWidth="33.67"
+        stroke="#6c6c6c"
+        d="M646.293 331.888L17.7538 17.6187L155.245 331.888M646.293 331.888L17.753 646.157L155.245 331.888M646.293 331.888L318.735 330.228L155.245 331.888"
+      ></path>
+    </svg>
+  </button>
+</div>
+
       </div>
     </div>
   );
