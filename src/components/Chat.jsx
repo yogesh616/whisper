@@ -6,6 +6,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useUser } from "../Context/Context";
 import '../App.css'
 import notification from '../assets/notification.mp3'
+import { LazyLoadImage } from "react-lazy-load-image-component";
+import "react-lazy-load-image-component/src/effects/blur.css";
 
 const Chat = () => {
   const { id: receiverId } = useParams();
@@ -31,8 +33,10 @@ const Chat = () => {
   const { bgImages, fonts } = useUser();
   const [image, setImage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-
+  const [chatMessage, setChatMessage] = useState("")
   
+
+ 
 
   const offcanvasRef = useRef(null);
   const chatRef = useRef(null);
@@ -58,18 +62,21 @@ const Chat = () => {
   async function sendMessage() {
     if (newMessage.trim()) {
       try {
+        setNewMessage("");
+        scrollToBottom();
+       
         const chatId = getChatId();
         const messagesRef = collection(db, "chats", chatId, "messages");
 
         await addDoc(messagesRef, {
-          text: newMessage,
+          text: chatMessage,
           sender: userId,
           receiver: receiverId,
           timestamp: Timestamp.fromDate(new Date()),
           name: userData?.displayName,
           photo: userData?.photoURL,
         });
-        setNewMessage("");
+       setChatMessage("");
         scrollToBottom();
         scrollToBottom();
       } catch (err) {
@@ -81,6 +88,7 @@ const Chat = () => {
    // Upload image
   const uploadImage = async (image) => {
     if (!image) return;
+    
   
     setIsUploading(true);
   
@@ -132,19 +140,22 @@ const Chat = () => {
 
   useEffect(() => {
     if (!userId || !receiverId) return;
-
+    scrollToBottom();
     const chatId = getChatId();
     const messagesRef = collection(db, "chats", chatId, "messages");
     const q = query(messagesRef, orderBy("timestamp"));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const messagesArray = querySnapshot.docs.map((doc) => doc.data());
+      
       setMessages(messagesArray);
        localStorage.setItem('chats', JSON.stringify(messagesArray));
       if (querySnapshot.size && querySnapshot.docs[querySnapshot.size - 1].data().sender !== userId) {
+        scrollToBottom();
+        
         audio.current.play();
       }
-
+      
       scrollToBottom();
       scrollToBottom();
     });
@@ -217,15 +228,21 @@ const Chat = () => {
           </button>
         </div>
         <div className="grid grid-cols-2 gap-4 p-4 overflow-auto h-1/2">
-          {bgImages.map((bgImage, index) => (
-            <div
-              key={index}
-              style={{ backgroundImage: `url(${bgImage})` }}
-              className="w-full h-24 bg-cover bg-center rounded-md cursor-pointer hover:opacity-80"
-              onClick={() => changeBGImage(bgImage)}
-            ></div>
-          ))}
-        </div>
+  {bgImages.map((bgImage, index) => (
+    <div
+      key={index}
+      className="w-full h-24 rounded-md cursor-pointer hover:opacity-80"
+      onClick={() => changeBGImage(bgImage)}
+    >
+      <LazyLoadImage
+        src={bgImage}
+        alt={`Background ${index}`}
+        effect="blur" // Add a blur effect while loading
+        className="w-full h-full bg-cover bg-center rounded-md"
+      />
+    </div>
+  ))}
+</div>
         <h1 className="text-xl px-4">Fonts</h1>
         <div className="flex flex-col items-center gap-4  px-2 overflow-auto h-1/2 pb-3">
           {fonts.map((font, index) => (
@@ -250,9 +267,9 @@ const Chat = () => {
               }`}
             >
               {message.text && <p>{message.text}</p>}
-              {message.image && (
+              {message.image &&  (
              
-               <img src={message.image} alt="uploaded" className="p-0.5 rounded-md w-48" />
+               <img src={ message.image } alt="uploaded" className="p-0.5 rounded-md w-48" />
               )}
             </div>
           </div>
@@ -293,9 +310,15 @@ const Chat = () => {
       </svg>
       <span className="tooltip">Add an image</span>
     </label>
-    <input type="file" id="file" name="file" onChange={(e) => uploadImage(e.target.files[0])} />
+    <input type="file" id="file" name="file" onChange={(e) => 
+      uploadImage(e.target.files[0])
+     
+    } />
   </div>
-  <input required="" placeholder="Message..." type="text" id="messageInput" value={newMessage} onChange={e=> setNewMessage(e.target.value)} onKeyDown={handleEnter}  />
+  <input required="" placeholder="Message..." type="text" id="messageInput" value={newMessage} onChange={e=> {
+setNewMessage(e.target.value);
+setChatMessage(e.target.value);
+  } } onKeyDown={handleEnter}  />
   <button id="sendButton" onClick={sendMessage}>
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 664 663">
       <path
