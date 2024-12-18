@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import { collection, addDoc, Timestamp, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, Timestamp, onSnapshot, query, orderBy, setDoc, doc } from "firebase/firestore";
 import { db, auth } from "../firebase_config";
 import { onAuthStateChanged } from "firebase/auth";
 import { useUser } from "../Context/Context";
@@ -194,7 +194,73 @@ const Chat = () => {
     }
   }
   
+  const [isTyping, setIsTyping] = useState(false);
+  const inputRef = useRef(null)
+  
+  // Function to update typing status in Firestore
+  const updateTypingStatus = async (isTyping) => {
+    try {
+      const chatId = getChatId();
+      const typingDocRef = doc(db, "chats", chatId, "typing", userId); // Reference the specific typing document
+  
+      await setDoc(typingDocRef, { typing: isTyping }); // Update the typing field with a Boolean value
+    } catch (err) {
+      console.error("Error updating typing status:", err);
+    }
+  };
+  
 
+  const handleTyping = (e) => {
+    const message = e.target.value;
+   
+  
+    // If the input field becomes empty, set typing status to false
+    if (message.trim() === "") {
+      updateTypingStatus(false);
+    } else {
+      updateTypingStatus(true);
+    }
+  };
+  
+  const handleInputFocus = () => {
+    updateTypingStatus(true); // Set typing status to true when the input is focused
+  };
+  useEffect(() => {
+    // Avoid calling updateTypingStatus if userId or receiverId is missing
+    if (!userId || !receiverId) return;
+  
+    updateTypingStatus(false); // Set initial typing status to false when the component loads
+    audio.current.play();
+  }, [userId, receiverId]);
+  
+  
+
+  useEffect(() => {
+    if (!userId || !receiverId) return;
+  
+    const chatId = getChatId();
+    const typingRef = collection(db, "chats", chatId, "typing");
+  
+    // Listen for real-time changes to the typing status
+    const unsubscribe = onSnapshot(typingRef, (snapshot) => {
+      let otherUserTyping = false;
+  
+      snapshot.forEach((doc) => {
+        // Only check if the other user (receiver) is typing
+        if (doc.id === receiverId && doc.data().typing) {
+          otherUserTyping = true;
+        }
+      });
+  
+      setIsTyping(otherUserTyping); // Update local state for typing indicator
+    });
+  
+    return () => {
+      unsubscribe();
+    };
+  }, [userId, receiverId]);
+  
+  
   return (
     <div className="flex flex-col h-screen bg-zinc-700">
       <div className="flex bg-zinc-700 items-center justify-between gap-2 p-1 px-3 text-slate-200 shadow-md">
@@ -257,7 +323,7 @@ const Chat = () => {
 
       </div>
 
-      <div id='theme' ref={chatRef} style={{fontFamily: chatFont, backgroundImage: `url(${bgurl})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'overlay', transition: 'all 0.5s ease'}} className=" flex-1 overflow-y-auto p-4 space-y-3">
+      <div id='theme' ref={chatRef} style={{height: '90vh', fontFamily: chatFont, backgroundImage: `url(${bgurl})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'overlay', transition: 'all 0.5s ease'}} className=" flex-1 overflow-y-auto p-4 space-y-3">
        
         {messages ? messages.map((message, index) => (
           <div key={index} className={`flex ${message.sender === userId ? "justify-end" : "justify-start"}`}>
@@ -272,15 +338,30 @@ const Chat = () => {
                <img src={ message.image } alt="uploaded" className="p-0.5 rounded-md w-48" />
               )}
             </div>
+            
           </div>
         )) : (<div className="loader">
           <svg viewBox="0 0 80 80">
             <circle r="32" cy="40" cx="40" id="test"></circle>
           </svg>
         </div>)}
+        <div  className="p-2  shadow-inner">
+      {isTyping && (
+        /* From Uiverse.io by aaronross1 */ 
+<div className="typing-indicator">
+    <div className="typing-circle"></div>
+    <div className="typing-circle"></div>
+    <div className="typing-circle"></div>
+    <div className="typing-shadow"></div>
+    <div className="typing-shadow"></div>
+    <div className="typing-shadow"></div>
+</div>
+      )}
+      </div>
         <div ref={messagesEndRef} />
       </div>
-
+      
+     
        <div className="p-2 bg-zinc-700 shadow-inner">
       
 <div className="messageBox">
@@ -315,10 +396,12 @@ const Chat = () => {
      
     } />
   </div>
-  <input required="" placeholder="Message..." type="text" id="messageInput" value={newMessage} onChange={e=> {
+  
+  <input ref={inputRef} required="" placeholder="Message..." type="text" id="messageInput" value={newMessage} onChange={e=> {
 setNewMessage(e.target.value);
 setChatMessage(e.target.value);
-  } } onKeyDown={handleEnter}  />
+handleTyping(e)
+  } } onKeyDown={handleEnter} onFocus={handleInputFocus} onBlur={() => updateTypingStatus(false)}  />
   <button id="sendButton" onClick={sendMessage}>
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 664 663">
       <path
