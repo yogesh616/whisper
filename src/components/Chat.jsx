@@ -323,7 +323,7 @@ const Chat = () => {
 
       </div>
 
-      <div id='theme' ref={chatRef} style={{height: '90vh', fontFamily: chatFont, backgroundImage: `url(${bgurl})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'overlay', transition: 'all 0.5s ease'}} className=" flex-1 overflow-y-auto p-4 space-y-3">
+      <div id='theme' ref={chatRef} style={{height: '90vh', fontFamily: chatFont, backgroundImage: `url(${bgurl})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'overlay', transition: 'all 0.5s ease'}} className="mb-3 flex-1 overflow-y-auto p-4 space-y-3">
        
         {messages ? messages.map((message, index) => (
           <div key={index} className={`flex ${message.sender === userId ? "justify-end" : "justify-start"}`}>
