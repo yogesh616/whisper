@@ -1,4 +1,4 @@
-// Chat.jsx (refactored)
+// Chat.jsx (with fixed reply UI and delete confirmation)
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import {
@@ -10,6 +10,7 @@ import {
   orderBy,
   setDoc,
   doc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db, auth } from "../firebase_config";
 import { onAuthStateChanged } from "firebase/auth";
@@ -26,25 +27,31 @@ const Chat = () => {
   const [userId, setUserId] = useState(null);
   const [currentUserData, setCurrentUserData] = useState({});
   const [messages, setMessages] = useState([]);
-  const [message, setMessage] = useState(""); // unified input state
+  const [message, setMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [bgUrl, setBgUrl] = useState("");
+  const [chatFont, setChatFont] = useState("");
+  const [replyTo, setReplyTo] = useState(null);
 
   const messagesEndRef = useRef(null);
   const offcanvasRef = useRef(null);
   const chatRef = useRef(null);
-
   const audioRef = useRef(new Audio(notification));
   const lastMessageIdRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const typingStateRef = useRef(false); // to avoid repeated writes
+  const typingStateRef = useRef(false);
 
   const { bgImages = [], fonts = [] } = useUser();
 
-  // ---- helper: chatId ----
+  const chatKey = () => {
+    const chatId = userId && receiverId ? [userId, receiverId].sort().join("_") : null;
+    return chatId ? `chat_${chatId}_messages` : null;
+  };
+
   const getChatId = () => (userId && receiverId ? [userId, receiverId].sort().join("_") : null);
 
-  // ---- auth observer to get current user id and profile ----
+  // ---- auth observer ----
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -62,15 +69,62 @@ const Chat = () => {
     return () => unsub();
   }, []);
 
+  // ---- apply persisted theme/font when opening chat ----
+  useEffect(() => {
+    const savedBg = localStorage.getItem("bgurl") || "";
+    const savedFont = localStorage.getItem("font") || "";
+    setBgUrl(savedBg);
+    setChatFont(savedFont);
+
+    if (chatRef.current) {
+      if (savedBg) chatRef.current.style.backgroundImage = `url('${savedBg}')`;
+      if (savedFont) chatRef.current.style.fontFamily = savedFont;
+    }
+  }, []);
+
+  // helper to apply visually & persist
+  function changeBGImage(url) {
+    if (chatRef.current) {
+      chatRef.current.style.backgroundImage = `url('${url}')`;
+    }
+    setBgUrl(url);
+    localStorage.setItem("bgurl", url);
+    toggleOffcanvas();
+  }
+
+  function changeFont(font) {
+    if (chatRef.current) {
+      chatRef.current.style.fontFamily = font;
+    }
+    setChatFont(font);
+    localStorage.setItem("font", font);
+    toggleOffcanvas();
+  }
+
   // ---- scroll helper ----
   const scrollToBottom = () => {
-    // small timeout to let DOM update
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }, 50);
   };
 
-  // ---- message listener ----
+  // ---- Restore cached messages for this chat on first load ----
+  useEffect(() => {
+    const key = chatKey();
+    if (!key) return;
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        setMessages(JSON.parse(cached));
+        setTimeout(scrollToBottom, 50);
+      }
+    } catch (e) {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, receiverId]);
+
+  // ---- Firestore message listener ----
   useEffect(() => {
     const chatId = getChatId();
     if (!chatId) return;
@@ -82,23 +136,19 @@ const Chat = () => {
       const msgs = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
       setMessages(msgs);
 
-      // store per-chat cache (optional)
+      // persist last N messages (say 50) to localStorage
       try {
-        localStorage.setItem(`chat_${chatId}`, JSON.stringify(msgs));
-      } catch (e) {
-        // ignore storage failures
-      }
+        const lastN = msgs.slice(-50);
+        localStorage.setItem(`chat_${chatId}_messages`, JSON.stringify(lastN));
+      } catch (e) {}
 
-      // play sound only when latest message is from other user and it's a new message
+      // play notification only for new remote messages
       if (msgs.length) {
         const latest = msgs[msgs.length - 1];
         const prevId = lastMessageIdRef.current;
         if (latest.id !== prevId && latest.sender !== userId) {
-          // only play when page is visible
           if (document.visibilityState === "visible") {
-            audioRef.current?.play().catch(() => {
-              /* autoplay blocked or error - ignore */
-            });
+            audioRef.current?.play().catch(() => {});
           }
         }
         lastMessageIdRef.current = latest.id;
@@ -110,37 +160,106 @@ const Chat = () => {
     return () => unsubscribe();
   }, [userId, receiverId]);
 
-  // ---- send a text message ----
+  // ---- typing indicator write ----
+  const setTyping = async (value) => {
+    const chatId = getChatId();
+    if (!chatId || !userId) return;
+
+    if (typingStateRef.current === value) return;
+    typingStateRef.current = value;
+
+    try {
+      const typingDocRef = doc(db, "chats", chatId, "typing", userId);
+      await setDoc(typingDocRef, { typing: value }, { merge: true });
+    } catch (err) {
+      console.error("Error updating typing status:", err);
+    }
+  };
+
+  // debounced typing handler
+  const handleTypingChange = (text) => {
+    setMessage(text);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    if (text.trim()) {
+      setTyping(true);
+      typingTimeoutRef.current = setTimeout(() => {
+        setTyping(false);
+      }, 1500);
+    } else {
+      setTyping(false);
+    }
+  };
+
+  // listen to other user's typing doc
+  useEffect(() => {
+    const chatId = getChatId();
+    if (!chatId || !receiverId) return;
+    const typingDocRef = doc(db, "chats", chatId, "typing", receiverId);
+    const unsub = onSnapshot(typingDocRef, (snap) => {
+      setIsTyping(Boolean(snap.exists() && snap.data().typing));
+    });
+    return () => unsub();
+  }, [userId, receiverId]);
+
+  // cleanup typing on unload
+  useEffect(() => {
+    const handleUnload = async () => {
+      try {
+        await setTyping(false);
+      } catch (e) {}
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      setTyping(false).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, receiverId]);
+
+  // ---- send text message (with reply support) ----
   const sendMessage = async () => {
     const text = (message || "").trim();
     if (!text) return;
-
     const chatId = getChatId();
     if (!chatId) return;
 
     const messagesRef = collection(db, "chats", chatId, "messages");
-
     try {
-      // clear local input immediately for UX
+      // optimistic clear
       setMessage("");
-      // optionally mark typing false
       await setTyping(false);
 
-      await addDoc(messagesRef, {
+      const msgPayload = {
         text,
         sender: userId,
         receiver: receiverId,
         timestamp: serverTimestamp(),
         name: currentUserData.displayName,
         photo: currentUserData.photoURL,
-      });
-      // scroll will be handled by snapshot listener
+      };
+
+      if (replyTo) {
+        // include reference
+        msgPayload.replyTo = {
+          id: replyTo.id,
+          text: replyTo.text || "",
+          image: replyTo.image || "",
+          sender: replyTo.sender,
+        };
+      }
+
+      await addDoc(messagesRef, msgPayload);
+
+      // clear reply after send
+      setReplyTo(null);
     } catch (err) {
       console.error("Error sending message:", err);
     }
   };
 
-  // ---- image upload + send (cloudinary) ----
+  // ---- send image message ----
   const uploadImage = async (file) => {
     if (!file) return;
     setIsUploading(true);
@@ -157,7 +276,32 @@ const Chat = () => {
       if (!res.ok) throw new Error("Upload failed");
       const json = await res.json();
       const imageUrl = json.secure_url;
-      await sendImage(imageUrl);
+
+      // send image message with optional replyTo
+      const chatId = getChatId();
+      if (!chatId) return;
+      const messagesRef = collection(db, "chats", chatId, "messages");
+
+      const msgPayload = {
+        image: imageUrl,
+        sender: userId,
+        receiver: receiverId,
+        timestamp: serverTimestamp(),
+        name: currentUserData.displayName,
+        photo: currentUserData.photoURL,
+      };
+
+      if (replyTo) {
+        msgPayload.replyTo = {
+          id: replyTo.id,
+          text: replyTo.text || "",
+          image: replyTo.image || "",
+          sender: replyTo.sender,
+        };
+      }
+
+      await addDoc(messagesRef, msgPayload);
+      setReplyTo(null);
     } catch (err) {
       console.error("Image upload failed:", err);
     } finally {
@@ -165,112 +309,42 @@ const Chat = () => {
     }
   };
 
-  const sendImage = async (imageUrl) => {
+  // ---- delete message (only by sender) - NO ALERT ----
+  const deleteMessage = async (msgId, msgSender) => {
+    if (!msgId) return;
+    if (msgSender !== userId) return;
+
     const chatId = getChatId();
     if (!chatId) return;
-    const messagesRef = collection(db, "chats", chatId, "messages");
+    
     try {
-      await addDoc(messagesRef, {
-        image: imageUrl,
-        sender: userId,
-        receiver: receiverId,
-        timestamp: serverTimestamp(),
-        name: currentUserData.displayName,
-        photo: currentUserData.photoURL,
-      });
+      await deleteDoc(doc(db, "chats", chatId, "messages", msgId));
+
+      // update local cache quickly (optional)
+      const key = chatKey();
+      if (key) {
+        try {
+          const cached = JSON.parse(localStorage.getItem(key) || "[]");
+          const filtered = cached.filter((m) => m.id !== msgId);
+          localStorage.setItem(key, JSON.stringify(filtered));
+        } catch (e) {}
+      }
     } catch (err) {
-      console.error("Error sending image:", err);
+      console.error("Error deleting message:", err);
     }
   };
 
-  // ---- typing indicator helpers ----
-  const setTyping = async (value) => {
-    const chatId = getChatId();
-    if (!chatId || !userId) return;
-
-    // reduce writes: only write when state changes
-    if (typingStateRef.current === value) return;
-    typingStateRef.current = value;
-
-    try {
-      const typingDocRef = doc(db, "chats", chatId, "typing", userId);
-      await setDoc(typingDocRef, { typing: value }, { merge: true });
-    } catch (err) {
-      console.error("Error updating typing status:", err);
-    }
-  };
-
-  // debounced handler for input changes to avoid too many writes
-  const handleTypingChange = (text) => {
-    setMessage(text);
-
-    // clear previous timer
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
-    // set typing true immediately (but setDoc guarded inside setTyping)
-    setTyping(true);
-
-    // set typing false after 1.5s of inactivity
-    typingTimeoutRef.current = setTimeout(() => {
-      setTyping(false);
-    }, 1500);
-  };
-
-  // ---- listen to the other user's typing doc ----
-  useEffect(() => {
-    const chatId = getChatId();
-    if (!chatId || !receiverId) return;
-
-    const typingDocRef = doc(db, "chats", chatId, "typing", receiverId);
-    const unsubscribe = onSnapshot(typingDocRef, (snap) => {
-      setIsTyping(Boolean(snap.exists() && snap.data().typing));
+  // ---- prepare reply action ----
+  const startReply = (msg) => {
+    setReplyTo({ 
+      id: msg.id, 
+      text: msg.text || "", 
+      image: msg.image || "", 
+      sender: msg.sender 
     });
-
-    return () => unsubscribe();
-  }, [userId, receiverId]);
-
-  // ---- cleanup typing state on unmount / page unload ----
-  useEffect(() => {
-    const handleUnload = async () => {
-      // try to set typing false (best-effort)
-      try {
-        await setTyping(false);
-      } catch (e) {}
-    };
-    window.addEventListener("beforeunload", handleUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleUnload);
-      // clear timer
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      // ensure typing false
-      setTyping(false).catch(() => {});
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, receiverId]);
-
-  // ---- small helpers for UI changes ----
-  function toggleOffcanvas() {
-    if (!offcanvasRef.current) return;
-    offcanvasRef.current.classList.toggle("translate-x-0");
-    offcanvasRef.current.classList.toggle("translate-x-full");
-  }
-
-  function changeBGImage(url) {
-    if (chatRef.current) {
-      chatRef.current.style.backgroundImage = `url('${url}')`;
-      localStorage.setItem("bgurl", url);
-    }
-    toggleOffcanvas();
-  }
-
-  function changeFont(font) {
-    if (chatRef.current) {
-      chatRef.current.style.fontFamily = font;
-      localStorage.setItem("font", font);
-    }
-    toggleOffcanvas();
-  }
+    // focus input
+    document.getElementById("messageInput")?.focus();
+  };
 
   // ---- send on Enter ----
   const handleEnter = (e) => {
@@ -280,19 +354,14 @@ const Chat = () => {
     }
   };
 
-  // ---- initial load: try to restore cached messages for this chat (optional) ----
-  useEffect(() => {
-    const chatId = getChatId();
-    if (!chatId) return;
-    try {
-      const cached = localStorage.getItem(`chat_${chatId}`);
-      if (cached) {
-        setMessages(JSON.parse(cached));
-        setTimeout(scrollToBottom, 50);
-      }
-    } catch (e) {}
-  }, [userId, receiverId]);
+  // ---- UI small helpers ----
+  function toggleOffcanvas() {
+    if (!offcanvasRef.current) return;
+    offcanvasRef.current.classList.toggle("translate-x-0");
+    offcanvasRef.current.classList.toggle("translate-x-full");
+  }
 
+  // ---- render ----
   return (
     <div className="flex flex-col h-screen bg-zinc-700">
       {/* header */}
@@ -303,11 +372,13 @@ const Chat = () => {
             src={receiverData?.photoURL || "https://www.pngall.com/wp-content/uploads/5/Profile-Avatar-PNG.png"}
             alt="profile"
           />
-          <h1 className="text-lg font-semibold">{receiverData?.displayName || "User"}</h1>
+          <div>
+            <h1 className="text-lg font-semibold">{receiverData?.displayName || "User"}</h1>
+            {isTyping && <p className="text-xs text-green-400">typing...</p>}
+          </div>
         </div>
         <div>
           <button onClick={toggleOffcanvas} className="font-medium rounded-lg text-sm px-5 py-2.5 mb-2">
-            {/* menu icon */}
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12H12m-8.25 5.25h16.5" />
             </svg>
@@ -316,7 +387,7 @@ const Chat = () => {
       </div>
 
       {/* offcanvas */}
-      <div ref={offcanvasRef} className="fixed inset-y-0 right-0 w-64 bg-zinc-700 text-white transform translate-x-full transition-transform duration-300">
+      <div ref={offcanvasRef} className="fixed inset-y-0 right-0 w-64 bg-zinc-700 text-white transform translate-x-full transition-transform duration-300 z-40">
         <div className="flex items-center justify-between p-4">
           <h1 className="text-xl">Themes</h1>
           <button onClick={toggleOffcanvas}>
@@ -337,7 +408,7 @@ const Chat = () => {
         <h1 className="text-xl px-4">Fonts</h1>
         <div className="flex flex-col items-center gap-4 px-2 overflow-auto h-1/2 pb-3">
           {fonts.map((font, index) => (
-            <div key={index} style={{ fontFamily: font }} className="w-24 h-auto bg-cover bg-center rounded-md cursor-pointer hover:opacity-80" onClick={() => changeFont(font)}>
+            <div key={index} style={{ fontFamily: font }} className="w-24 h-auto bg-cover bg-center rounded-md cursor-pointer hover:opacity-80 p-2 text-center" onClick={() => changeFont(font)}>
               {font}
             </div>
           ))}
@@ -345,37 +416,87 @@ const Chat = () => {
       </div>
 
       {/* chat area */}
-      <div id="theme" ref={chatRef} style={{ height: "90vh", backgroundRepeat: "no-repeat", backgroundSize: "cover", backgroundPosition: "center", backgroundBlendMode: "overlay", transition: "all 0.5s ease" }} className="mb-3 flex-1 overflow-y-auto p-4 space-y-3">
+      <div
+        id="theme"
+        ref={chatRef}
+        style={{
+          height: "90vh",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundBlendMode: "overlay",
+          transition: "all 0.5s ease",
+          backgroundImage: bgUrl ? `url('${bgUrl}')` : undefined,
+          fontFamily: chatFont || undefined,
+        }}
+        className="mb-3 flex-1 overflow-y-auto p-4 space-y-3"
+      >
         {messages.length ? (
           messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.sender === userId ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-xs p-3 rounded-lg ${msg.sender === userId ? "bg-blue-500 text-white rounded-br-none" : "bg-gray-200 text-gray-900 rounded-bl-none"}`}>
-                {msg.text && <p>{msg.text}</p>}
-                {msg.image && <img src={msg.image} alt="uploaded" className="p-0.5 rounded-md w-48" />}
-                <div className="text-xs text-gray-500 mt-1 text-right">
-                  {msg.timestamp && msg.timestamp.toDate ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                {/* reply snippet */}
+                {msg.replyTo && (
+                  <div className={`mb-2 p-2 rounded text-xs border-l-2 ${msg.sender === userId ? "bg-blue-600/50 border-blue-300" : "bg-gray-300 border-gray-500"}`}>
+                    <div className={`font-semibold text-xs mb-1 ${msg.sender === userId ? "text-blue-100" : "text-gray-700"}`}>
+                      Replying to
+                    </div>
+                    <div className={`text-xs truncate ${msg.sender === userId ? "text-white/90" : "text-gray-800"}`}>
+                      {msg.replyTo.text || (msg.replyTo.image ? "📷 Photo" : "Message")}
+                    </div>
+                  </div>
+                )}
+
+                {msg.text && <p className="break-words">{msg.text}</p>}
+                {msg.image && <img src={msg.image} alt="uploaded" className="mt-2 rounded-md w-48" />}
+
+                <div className="text-xs mt-2 flex items-center justify-between gap-2">
+                  <span className={msg.sender === userId ? "text-blue-100" : "text-gray-500"}>
+                    {msg.timestamp && msg.timestamp.toDate ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                  </span>
+
+                  <div className="flex gap-2">
+                    {/* Reply button */}
+                    <button 
+                      title="Reply" 
+                      className={`text-xs hover:underline ${msg.sender === userId ? "text-blue-100 hover:text-white" : "text-gray-600 hover:text-gray-900"}`}
+                      onClick={() => startReply(msg)}
+                    >
+                      ↩️ Reply
+                    </button>
+                    
+                    {/* Delete button - only for sender */}
+                    {msg.sender === userId && (
+                      <button 
+                        title="Delete" 
+                        className="text-xs text-red-300 hover:text-red-100 hover:underline"
+                        onClick={() => deleteMessage(msg.id, msg.sender)}
+                      >
+                        🗑️ Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ))
         ) : (
-          <div className="loader">
-            <svg viewBox="0 0 80 80">
-              <circle r="32" cy="40" cx="40" id="test"></circle>
-            </svg>
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center text-gray-300">
+              <h2 className="text-2xl font-semibold">Start your legendary conversation</h2>
+              <p className="mt-2 text-sm text-gray-400">Say hello 👋</p>
+            </div>
           </div>
         )}
 
         {isTyping && (
-          <div className="p-2">
-            {/* typing indicator */}
-            <div className="typing-indicator">
-              <div className="typing-circle"></div>
-              <div className="typing-circle"></div>
-              <div className="typing-circle"></div>
-              <div className="typing-shadow"></div>
-              <div className="typing-shadow"></div>
-              <div className="typing-shadow"></div>
+          <div className="flex justify-start">
+            <div className="bg-gray-200 p-3 rounded-lg rounded-bl-none">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
             </div>
           </div>
         )}
@@ -385,6 +506,25 @@ const Chat = () => {
 
       {/* composer */}
       <div className="p-2 bg-zinc-700 shadow-inner">
+        {/* Reply preview bar - OUTSIDE messageBox */}
+        {replyTo && (
+          <div className="mb-2 p-2 bg-zinc-600 rounded-lg flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-blue-300 font-medium">Replying to:</div>
+              <div className="text-sm text-white truncate">
+                {replyTo.text || (replyTo.image ? "📷 Photo" : "Message")}
+              </div>
+            </div>
+            <button 
+              className="ml-3 text-white/70 hover:text-white text-lg leading-none px-2"
+              onClick={() => setReplyTo(null)}
+              title="Cancel reply"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className="messageBox">
           <div className="fileUploadWrapper">
             <label htmlFor="file">
@@ -399,23 +539,34 @@ const Chat = () => {
               type="file"
               id="file"
               name="file"
+              accept="image/*"
               onChange={(e) => {
-                if (e.target.files?.[0]) uploadImage(e.target.files[0]);
+                if (e.target.files?.[0]) {
+                  uploadImage(e.target.files[0]);
+                  e.target.value = ""; // Reset input
+                }
               }}
             />
           </div>
 
           <input
-            placeholder="Message..."
+            placeholder={isUploading ? "Uploading image..." : "Message..."}
             type="text"
             id="messageInput"
             value={message}
             onChange={(e) => handleTypingChange(e.target.value)}
             onKeyDown={handleEnter}
             onBlur={() => setTyping(false)}
+            disabled={isUploading}
+            className="w-full px-3 py-2 rounded"
           />
 
-          <button id="sendButton" onClick={sendMessage}>
+          <button 
+            id="sendButton" 
+            onClick={sendMessage}
+            disabled={!message.trim() || isUploading}
+            className="ml-2 disabled:opacity-50"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 664 663" className="w-6 h-6">
               <path strokeLinejoin="round" strokeLinecap="round" strokeWidth="33.67" stroke="#6c6c6c" d="M646.293 331.888L17.7538 17.6187L155.245 331.888M646.293 331.888L17.753 646.157L155.245 331.888M646.293 331.888L318.735 330.228L155.245 331.888"></path>
             </svg>
