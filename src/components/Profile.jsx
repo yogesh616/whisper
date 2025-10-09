@@ -1,134 +1,166 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase_config';
-import Header from './Header';
-import ChatList from './ChatList';
-
-
-import { signOut } from 'firebase/auth';
-import { useNavigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
+import React, { useState, useEffect } from "react";
+import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
+import { db, auth } from "../firebase_config";
+import Header from "./Header";
+import ChatList from "./ChatList";
+import { signOut, onAuthStateChanged } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
 function Profile() {
-  const [users, setUsers] = useState([]); // State to hold all users
-  const [userId, setUserId] = useState(); // State to hold
- 
-  const navigate = useNavigate(); // UseNavigate hook for navigation
-  const popoverRef = useRef(null)
-  
+  const [users, setUsers] = useState([]);
+  const [userId, setUserId] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+
+  const navigate = useNavigate();
+
+  // ✅ Track auth state
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        setUserId(user.uid); // Set user ID
-       
-      }
-      else {
-        navigate('/')
+        setUserId(user.uid);
+
+        const userRef = doc(db, "USERS", user.uid);
+
+        // Mark as online
+        try {
+          await updateDoc(userRef, { status: true });
+        } catch (err) {
+          console.error("Error setting status true:", err);
+        }
+
+        // Mark as offline when tab closes or refreshes
+        const handleUnload = async () => {
+          try {
+            await updateDoc(userRef, { status: false });
+          } catch (err) {
+            console.error("Error setting status false on unload:", err);
+          }
+        };
+
+        window.addEventListener("beforeunload", handleUnload);
+
+        // Cleanup on unmount
+        return () => {
+          window.removeEventListener("beforeunload", handleUnload);
+        };
+      } else {
+        navigate("/");
       }
     });
-  
-    return () => unsubscribe(); // Cleanup listener on component unmount
-  }, []);
-  
-  
+
+    return () => unsubscribe();
+  }, [navigate]);
+
+  // ✅ Logout function
   async function logout() {
-    if (userId) {
-      try {
-        const userRef = doc(db, "USERS", userId);
-        await updateDoc(userRef, { status: false }); // Update user status
-        await signOut(auth); // Log out the user
-        navigate("/"); // Redirect to login
-        if (popoverRef.current) {
-            popoverRef.current.classList.add("hidden");
-            popoverRef.current.classList.remove("block");
-          
-          }
-      } catch (error) {
-        console.error("Error signing out:", error);
-      }
-    } else {
-      console.error("No user is currently logged in.");
+    if (!userId) return;
+    try {
+      const userRef = doc(db, "USERS", userId);
+      await updateDoc(userRef, { status: false });
+      await signOut(auth);
+      setShowModal(false);
+      navigate("/");
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
   }
-  
-  // Function to fetch all users
+
+  // ✅ Fetch all users (for chat list)
   const fetchAllUsers = async () => {
     try {
-      const usersCollectionRef = collection(db, 'USERS'); // Reference to USERS collection
-      const querySnapshot = await getDocs(usersCollectionRef); // Fetch all documents
-      const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); // Map to array of user objects
-      setUsers(usersList); // Update state
-      
+      const usersCollectionRef = collection(db, "USERS");
+      const querySnapshot = await getDocs(usersCollectionRef);
+      const usersList = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setUsers(usersList);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error("Error fetching users:", error);
     }
   };
 
   useEffect(() => {
-    fetchAllUsers(); // Fetch users on component mount
+    fetchAllUsers();
   }, []);
-
- 
-  function showPopOver() {
-    if (popoverRef.current) {
-      popoverRef.current.classList.add("block");
-      popoverRef.current.classList.remove("hidden");
-
-    
-    }
-  }
-  function hidePopOver() {
-    if (popoverRef.current) {
-      popoverRef.current.classList.add("hidden");
-      popoverRef.current.classList.remove("block");
-    
-    }
-  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Header */}
       <Header />
 
-      {/* Chats Section */}
+      {/* Chat List */}
       <div className="flex-1 overflow-y-auto">
-        <ChatList users={users} /> {/* Pass users to ChatList component */}
+        <ChatList users={users} />
       </div>
 
-      
-   
-      <button
-  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
-  onClick={showPopOver}
-  
->
-  Log Out
-</button>
+      {/* Logout Button */}
+      <div className="p-4 flex justify-center">
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold shadow-md transition-all duration-200"
+        >
+          Log Out
+        </button>
+      </div>
 
-<div ref={popoverRef} id="popup-modal" tabIndex="-1" className="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
-    <div className="relative p-4 w-full max-w-md max-h-full">
-        <div className="relative bg-white rounded-lg shadow dark:bg-gray-700">
-            <button onClick={hidePopOver} type="button" className="absolute top-3 end-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-hide="popup-modal">
-                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
-                </svg>
-                <span className="sr-only">Close modal</span>
+      {/* Logout Confirmation Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 w-80 sm:w-96 relative">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-            <div className="p-4 md:p-5 text-center">
-                <svg className="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                </svg>
-                <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Are you sure you want to log out?</h3>
-                <button onClick={logout} data-modal-hide="popup-modal" type="button" className="text-white bg-red-600 hover:bg-red-800 focus:ring-4 focus:outline-none focus:ring-red-300 dark:focus:ring-red-800 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center">
-                    Yes, I'm sure
-                </button>
-                <button onClick={hidePopOver} data-modal-hide="popup-modal" type="button" className="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">No, cancel</button>
-            </div>
-        </div>
-    </div>
-</div>
 
-</div>
+            {/* Modal Content */}
+            <div className="text-center">
+              <svg
+                className="mx-auto mb-3 text-gray-400 w-12 h-12 dark:text-gray-200"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <h3 className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-200">
+                Are you sure you want to log out?
+              </h3>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={logout}
+                  className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg transition-all duration-200"
+                >
+                  Yes, log out
+                </button>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="border border-gray-300 text-gray-700 dark:text-gray-300 px-5 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
