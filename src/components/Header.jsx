@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 const Header = () => {
   const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
-  const { setUserListData } = useUser();
+  const { setUserListData,  setIsOffcanvasOpen } = useUser();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -62,7 +62,7 @@ const Header = () => {
         <h1 className="text-lg sm:text-xl font-semibold text-gray-800">
           {currentUser?.displayName || "Loading..."}
         </h1>
-        <button className="p-2 rounded-full hover:bg-gray-100 transition">
+        <button  onClick={() => setIsOffcanvasOpen(true)} className="p-2 rounded-full hover:bg-gray-100 transition">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -83,7 +83,7 @@ const Header = () => {
       {/* Stories Row */}
       <div className="flex items-center gap-4 overflow-x-auto hide-scrollbar pb-2">
         {/* Optional: Add Story Placeholder */}
-        <div className="flex flex-col items-center shrink-0 cursor-pointer">
+        <div className=" flex-col items-center shrink-0 cursor-pointer hidden">
           <div className="h-14 w-14 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition">
             <span className="text-2xl font-bold">+</span>
           </div>
