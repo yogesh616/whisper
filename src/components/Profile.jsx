@@ -88,78 +88,10 @@ function Profile() {
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Header */}
       <Header />
-
       {/* Chat List */}
       <div className="flex-1 overflow-y-auto">
         <ChatList users={users} />
       </div>
-
-      {/* Logout Button */}
-      <div className="p-4 flex justify-center">
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold shadow-md transition-all duration-200"
-        >
-          Log Out
-        </button>
-      </div>
-
-      {/* Logout Confirmation Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 w-80 sm:w-96 relative">
-            {/* Close Button */}
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Modal Content */}
-            <div className="text-center">
-              <svg
-                className="mx-auto mb-3 text-gray-400 w-12 h-12 dark:text-gray-200"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <h3 className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-200">
-                Are you sure you want to log out?
-              </h3>
-              <div className="flex justify-center gap-3">
-                <button
-                  onClick={logout}
-                  className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg transition-all duration-200"
-                >
-                  Yes, log out
-                </button>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="border border-gray-300 text-gray-700 dark:text-gray-300 px-5 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
