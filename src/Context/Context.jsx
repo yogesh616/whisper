@@ -26,7 +26,9 @@ export const UserProvider =({children}) => {
       ];
 
       const fonts = ["Sour Gummy", "Parkinsans", "Poppins", "Kanit", "Cedarville Cursive"]
-    return <UserContext.Provider value={{userListData, setUserListData, bgImages, fonts}}>
+
+      const [isOffcanvasOpen, setIsOffcanvasOpen] = useState(false);
+    return <UserContext.Provider value={{userListData, setUserListData, bgImages, fonts, isOffcanvasOpen, setIsOffcanvasOpen}}>
         {children}
     </UserContext.Provider>
 }
